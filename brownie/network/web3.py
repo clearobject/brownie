@@ -4,7 +4,7 @@ import json
 import os
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional, Set
+from typing import Dict, Optional, Set
 
 from ens import ENS
 from web3 import HTTPProvider, IPCProvider
@@ -44,7 +44,7 @@ class Web3(_Web3):
             middleware.uninstall()
         self._custom_middleware.clear()
 
-    def connect(self, uri: str, timeout: int = 30, args: Optional[Any] = None, kwargs: Optional[Any] = None) -> None:
+    def connect(self, uri: str, timeout: int = 30, args: Optional[dict] = {}, kwargs: Optional[dict] = {}) -> None:
         """Connects to a provider"""
         self._remove_middlewares()
         self.provider = None

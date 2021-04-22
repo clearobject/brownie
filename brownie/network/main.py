@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 import warnings
-from typing import Any, Optional, Tuple, Union
+from typing import Optional, Tuple, Union
 
 from brownie import project
 from brownie._config import CONFIG
@@ -18,7 +18,7 @@ chain = Chain()
 rpc = Rpc()
 
 
-def connect(network: str = None, launch_rpc: bool = True, args: Optional[Any] = None, kwargs: Optional[Any] = None) -> None:
+def connect(network: str = None, launch_rpc: bool = True, args: Optional[dict] = {}, kwargs: Optional[dict] = {}) -> None:
     """Connects to the network.
 
     Args:
