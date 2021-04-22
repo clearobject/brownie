@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 import warnings
-from typing import Optional, Tuple, Union
+from typing import Any, Optional, Tuple, Union
 
 from brownie import project
 from brownie._config import CONFIG
@@ -18,7 +18,7 @@ chain = Chain()
 rpc = Rpc()
 
 
-def connect(network: str = None, launch_rpc: bool = True) -> None:
+def connect(network: str = None, launch_rpc: bool = True, args: Optional[Any] = None, kwargs: Optional[Any] = None) -> None:
     """Connects to the network.
 
     Args:
@@ -37,7 +37,7 @@ def connect(network: str = None, launch_rpc: bool = True) -> None:
             except KeyError:
                 pass
 
-        web3.connect(host, active.get("timeout", 30))
+        web3.connect(host, active.get("timeout", 30), args=args, kwargs=kwargs)
         if CONFIG.network_type == "development" and launch_rpc and not rpc.is_active():
             if is_connected():
                 if web3.eth.block_number != 0:

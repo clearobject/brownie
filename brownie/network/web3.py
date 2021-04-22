@@ -4,7 +4,7 @@ import json
 import os
 import time
 from pathlib import Path
-from typing import Dict, Optional, Set
+from typing import Any, Dict, Optional, Set
 
 from ens import ENS
 from web3 import HTTPProvider, IPCProvider
@@ -44,7 +44,7 @@ class Web3(_Web3):
             middleware.uninstall()
         self._custom_middleware.clear()
 
-    def connect(self, uri: str, timeout: int = 30) -> None:
+    def connect(self, uri: str, timeout: int = 30, args: Optional[Any] = None, kwargs: Optional[Any] = None) -> None:
         """Connects to a provider"""
         self._remove_middlewares()
         self.provider = None
@@ -52,16 +52,16 @@ class Web3(_Web3):
         uri = _expand_environment_vars(uri)
         try:
             if Path(uri).exists():
-                self.provider = IPCProvider(uri, timeout=timeout)
+                self.provider = IPCProvider(uri, timeout=timeout, args=args, kwargs=kwargs)
         except OSError:
             pass
 
         if self.provider is None:
             if uri.startswith("ws"):
-                self.provider = WebsocketProvider(uri, {"close_timeout": timeout})
+                self.provider = WebsocketProvider(uri, {"close_timeout": timeout, **kwargs})
             elif uri.startswith("http"):
 
-                self.provider = HTTPProvider(uri, {"timeout": timeout})
+                self.provider = HTTPProvider(uri, {"timeout": timeout, **kwargs})
             else:
                 raise ValueError(
                     "Unknown URI - must be a path to an IPC socket, a websocket "
