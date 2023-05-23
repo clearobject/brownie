@@ -12,7 +12,7 @@ attrs==21.2.0
     #   pytest
 babel==2.9.1
     # via sphinx
-backports.entry-points-selectable==1.1.0
+backports-entry-points-selectable==1.1.0
     # via virtualenv
 bleach==3.3.1
     # via readme-renderer
@@ -83,12 +83,12 @@ markupsafe==2.0.1
     # via jinja2
 mccabe==0.6.1
     # via flake8
+mypy==0.720
+    # via -r requirements-dev.in
 mypy-extensions==0.4.3
     # via
     #   -c requirements.txt
     #   mypy
-mypy==0.720
-    # via -r requirements-dev.in
 packaging==21.0
     # via
     #   -c requirements.txt
@@ -129,27 +129,27 @@ pyparsing==2.4.7
     # via
     #   -c requirements.txt
     #   packaging
-pytest-cov==2.12.1
-    # via -r requirements-dev.in
-pytest-mock==3.6.1
-    # via -r requirements-dev.in
 pytest==6.2.4
     # via
     #   -c requirements.txt
     #   pytest-cov
     #   pytest-mock
+pytest-cov==2.12.1
+    # via -r requirements-dev.in
+pytest-mock==3.6.1
+    # via -r requirements-dev.in
 pytz==2021.1
     # via babel
 readme-renderer==29.0
     # via twine
-requests-toolbelt==0.9.1
-    # via twine
-requests==2.26.0
+requests==2.31.0
     # via
     #   -c requirements.txt
     #   requests-toolbelt
     #   sphinx
     #   twine
+requests-toolbelt==0.9.1
+    # via twine
 rfc3986==1.5.0
     # via twine
 secretstorage==3.3.1
@@ -163,12 +163,12 @@ six==1.16.0
     #   virtualenv
 snowballstemmer==2.1.0
     # via sphinx
-sphinx-rtd-theme==0.5.2
-    # via -r requirements-dev.in
 sphinx==4.1.1
     # via
     #   -r requirements-dev.in
     #   sphinx-rtd-theme
+sphinx-rtd-theme==0.5.2
+    # via -r requirements-dev.in
 sphinxcontrib-applehelp==1.0.2
     # via sphinx
 sphinxcontrib-devhelp==1.0.2
