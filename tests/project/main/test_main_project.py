@@ -45,6 +45,13 @@ def test_load_raises_already_loaded(project, newproject):
         newproject.load()
 
 
+def test_load_does_not_raise_when_raise_if_loaded_is_false(project, newproject):
+    newproject.load()
+    loaded_project = project.load(newproject._path, "NewProject", raise_if_loaded=False)
+    assert loaded_project is newproject
+    newproject.load(raise_if_loaded=False)
+
+
 def test_load_raises_cannot_find(project, tmp_path):
     with pytest.raises(ProjectNotFound):
         x = project.load(tmp_path)
@@ -123,20 +130,6 @@ def test_create_folders(project, tmp_path):
     project.main._create_folders(Path(tmp_path))
     for path in ("contracts", "interfaces", "scripts", "reports", "tests", "build"):
         assert Path(tmp_path).joinpath(path).exists()
-
-
-def test_from_ethpm(ipfs_mock, project):
-    p = project.from_ethpm("ipfs://testipfs-math")
-    assert type(p) is TempProject
-    assert "Math" in p
-    assert not len(p.Math)
-
-
-def test_from_ethpm_with_deployments(ipfs_mock, project, network):
-    network.connect("mainnet")
-    p = project.from_ethpm("ipfs://testipfs-math")
-    assert len(p.Math) == 1
-    assert p.Math[0].address == "0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2"
 
 
 def test_compile_source_solc_without_pragma(project):

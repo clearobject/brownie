@@ -1,3 +1,4 @@
+import re
 from typing import Callable, Dict, List, Optional
 
 from web3 import Web3
@@ -8,7 +9,7 @@ from brownie.network.middlewares import BrownieMiddlewareABC
 class HardhatMiddleWare(BrownieMiddlewareABC):
     @classmethod
     def get_layer(cls, w3: Web3, network_type: str) -> Optional[int]:
-        if w3.clientVersion.lower().startswith("hardhat"):
+        if w3.client_version.lower().startswith("hardhat"):
             return -100
         else:
             return None
@@ -17,7 +18,10 @@ class HardhatMiddleWare(BrownieMiddlewareABC):
         result = make_request(method, params)
 
         # modify Hardhat transaction error to mimick the format that Ganache uses
-        if method in ("eth_call", "eth_sendTransaction") and "error" in result:
+        if (
+            method in ("eth_call", "eth_sendTransaction", "eth_sendRawTransaction")
+            and "error" in result
+        ):
             message = result["error"]["message"]
             if message.startswith("Error: VM Exception") or message.startswith(
                 "Error: Transaction reverted"
@@ -35,6 +39,11 @@ class HardhatMiddleWare(BrownieMiddlewareABC):
                     data.update({"error": "revert", "reason": None})
                 elif message.startswith("revert"):
                     data.update({"error": "revert", "reason": message[7:]})
+                elif "reverted with reason string '" in message:
+                    data.update(error="revert", reason=re.findall(".*?'(.*)'$", message)[0])
+                elif "reverted with an unrecognized custom error" in message:
+                    message = message[message.index("0x") : -1]
+                    data.update(error="revert", reason=message)
                 else:
                     data["error"] = message
         return result

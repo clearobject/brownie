@@ -7,15 +7,11 @@ import shutil
 import sys
 from copy import deepcopy
 from pathlib import Path
-from typing import Dict, List
 
 import pytest
 import solcx
 from _pytest.monkeypatch import MonkeyPatch
-from ethpm._utils.ipfs import dummy_ipfs_pin
-from ethpm.backends.ipfs import BaseIPFSBackend
 from prompt_toolkit.input.defaults import create_pipe_input
-from semantic_version import Version
 
 import brownie
 from brownie._cli.console import Console
@@ -96,27 +92,6 @@ def pytest_generate_tests(metafunc):
         metafunc.parametrize("evmtester", params, indirect=True)
 
 
-# travis cannot call github ethereum/solidity API, so this method is patched
-def pytest_sessionstart(session):
-    if not session.config.getoption("--evm"):
-        monkeypatch_session = MonkeyPatch()
-        monkeypatch_session.setattr(
-            "solcx.get_installable_solc_versions",
-            lambda: [
-                Version("0.6.7"),
-                Version("0.6.2"),
-                Version("0.6.0"),
-                Version("0.5.15"),
-                Version("0.5.8"),
-                Version("0.5.7"),
-                Version("0.5.0"),
-                Version("0.4.25"),
-                Version("0.4.24"),
-                Version("0.4.22"),
-            ],
-        )
-
-
 @pytest.fixture(scope="session")
 def network_name():
     return _dev_network
@@ -169,6 +144,7 @@ def _copy_all(src_folder, dest_folder):
 
 # project fixtures
 
+
 # creates a temporary folder and sets it as the working directory
 @pytest.fixture
 def project(tmp_path):
@@ -201,6 +177,15 @@ def testproject(_project_factory, project, tmp_path):
     _copy_all(_project_factory, path)
     os.chdir(path)
     return project.load(path, "TestProject")
+
+
+# same as function above but doesn't compile
+@pytest.fixture
+def testproject_nocompile(_project_factory, project, tmp_path):
+    path = tmp_path.joinpath("testproject")
+    _copy_all(_project_factory, path)
+    os.chdir(path)
+    return project.load(path, "TestProject", compile=False)
 
 
 @pytest.fixture
@@ -388,50 +373,6 @@ def vypertester(testproject, devnetwork, accounts):
 
 
 # ipfs fixtures
-
-
-class DummyIPFSBackend(BaseIPFSBackend):
-
-    _assets: Dict = {}
-    _path = Path("./tests/data/ipfs-cache-mock").resolve()
-
-    def fetch_uri_contents(self, ipfs_uri: str) -> bytes:
-        ipfs_uri = ipfs_uri.replace("ipfs://", "")
-        if ipfs_uri not in self._assets:
-            with self._path.joinpath(ipfs_uri).open() as fp:
-                self._assets[ipfs_uri] = fp.read()
-        return self._assets[ipfs_uri].encode()
-
-    def pin_assets(self, file_or_dir_path: Path) -> List:
-        """
-        Return a dict containing the IPFS hash, file name, and size of a file.
-        """
-        if file_or_dir_path.is_dir():
-            for path in file_or_dir_path.glob("*"):
-                with path.open() as fp:
-                    self._assets[path.name] = fp.read()
-            asset_data = [dummy_ipfs_pin(path) for path in file_or_dir_path.glob("*")]
-        elif file_or_dir_path.is_file():
-            asset_data = [dummy_ipfs_pin(file_or_dir_path)]
-            with file_or_dir_path.open() as fp:
-                self._assets[file_or_dir_path.name] = fp.read()
-            self._assets[asset_data[0]["Hash"]] = self._assets[file_or_dir_path.name]
-        else:
-            raise FileNotFoundError(f"{file_or_dir_path} is not a valid file or directory path.")
-        return asset_data
-
-
-@pytest.fixture
-def ipfs_mock(monkeypatch):
-    monkeypatch.setattr("brownie.project.ethpm.InfuraIPFSBackend", DummyIPFSBackend)
-    ipfs_path = brownie._config._get_data_folder().joinpath("ipfs_cache")
-    temp_path = ipfs_path.parent.joinpath("_ipfs_cache")
-    ipfs_path.mkdir(exist_ok=True)
-    ipfs_path.rename(temp_path)
-    yield DummyIPFSBackend()
-    if ipfs_path.exists():
-        shutil.rmtree(ipfs_path)
-    temp_path.rename(ipfs_path)
 
 
 @pytest.fixture

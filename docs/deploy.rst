@@ -4,7 +4,7 @@
 Deployment Basics
 =================
 
-Once your project is ready to be deployed to a persistent chain (such as the Etherem mainnet or a testnet), Brownie can be used to handle the deployments.
+Once your project is ready to be deployed to a persistent chain (such as the Ethereum mainnet or a testnet), Brownie can be used to handle the deployments.
 
 It is important to remember that blockchains are `permanent` and `immutable`. Once your project has been deployed there is no going back. For this reason, we highly recommend the following process when deploying to the mainnet:
 
@@ -12,8 +12,6 @@ It is important to remember that blockchains are `permanent` and `immutable`. On
     2. Test the script on your local development environment
     3. Test the script again on one of the `public test networks <https://medium.com/compound-finance/the-beginners-guide-to-using-an-ethereum-test-network-95bbbc85fc1d>`_ and verify that it executed as intended
     4. Use the script to deploy your project to the mainnet
-
-Once deployment is complete you may also :ref:`create an ethPM package<ethpm>` to simplify the process for other developers who wish to interact with your project.
 
 Writing a Deployment Script
 ===========================

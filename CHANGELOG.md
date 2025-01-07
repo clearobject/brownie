@@ -6,10 +6,247 @@ This changelog format is based on [Keep a Changelog](https://keepachangelog.com/
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased](https://github.com/eth-brownie/brownie)
+
+## [1.20.7](https://github.com/eth-brownie/brownie/tree/v1.20.7) - 2025-01-07
+### Added
+- Support for vyper `0.4.0` ([#1793](https://github.com/eth-brownie/brownie/pull/1793))
+- `py.typed` marker ([#1794](https://github.com/eth-brownie/brownie/pull/1794))
+
+### Fixed
+- Improvements to caching ([#1786](https://github.com/eth-brownie/brownie/pull/1786))
+
+### Removed
+- `tqdm` progress bars during compiler installation ([#1785](https://github.com/eth-brownie/brownie/pull/1785))
+
+## [1.20.6](https://github.com/eth-brownie/brownie/tree/v1.20.6) - 2024-06-22
+### Added
+- `include` kwarg for address strategy, type-dependent strategy overloads ([#1780](https://github.com/eth-brownie/brownie/pull/1780))
+
+### Fixed
+- ds-note decoding ([#1781](https://github.com/eth-brownie/brownie/pull/1781))
+- "Dropped without known replacement" tx race condition ([#1782](https://github.com/eth-brownie/brownie/pull/1782))
+
+## [1.20.5](https://github.com/eth-brownie/brownie/tree/v1.20.5) - 2024-05-22
+### Fixed
+- Handle missing `blockNumber` while awaiting confirmation ([#1774](https://github.com/eth-brownie/brownie/pull/1774))
+- Search parent paths for file import during source verification ([#1776](https://github.com/eth-brownie/brownie/pull/1776))
+
+## [1.20.4](https://github.com/eth-brownie/brownie/tree/v1.20.4) - 2024-05-08
+### Fixed
+- Fall back to ABI when `Contract.from_explorer` compilation fails ([#1772](https://github.com/eth-brownie/brownie/pull/1772))
+
+## [1.20.3](https://github.com/eth-brownie/brownie/tree/v1.20.3) - 2024-05-05
+### Added
+- Config setting to disable short-term caching ([#1767](https://github.com/eth-brownie/brownie/pull/1767))
+- Support for blast chain contract verification ([#1765](https://github.com/eth-brownie/brownie/pull/1765))
+- Support for additional anvil cmdline args ([#1756](https://github.com/eth-brownie/brownie/pull/1756))
+
+### Fixed
+- Target different blocks for live/dev networks when adding POA middleware ([#1769](https://github.com/eth-brownie/brownie/pull/1769))
+- Dict keys for nested tuples in returndata ([#1768](https://github.com/eth-brownie/brownie/pull/1768))
+- Solidity error code decoding ([#1758](https://github.com/eth-brownie/brownie/pull/1758))
+
+## [1.20.2](https://github.com/eth-brownie/brownie/tree/v1.20.2) - 2024-02-24
+### Added
+- Support for vyper `0.3.10` new pragma format ([#1747](https://github.com/eth-brownie/brownie/pull/1747))
+
+### Changed
+- Loosen package installation restrictions ([#1753](https://github.com/eth-brownie/brownie/pull/1753))
+
+### Fixed
+- Reset `multicall` call code even if call reverts ([#1746](https://github.com/eth-brownie/brownie/pull/1746))
+- `TypeError` when outputting custom errors ([#1751](https://github.com/eth-brownie/brownie/pull/1751))
+
+## [1.20.1](https://github.com/eth-brownie/brownie/tree/v1.20.1) - 2024-02-12
+### Added
+- verbose option for `multicall` debugging ([#1743](https://github.com/eth-brownie/brownie/pull/1743))
+
+### Fixed
+- handle exceptions within caching middleware ([#1742](https://github.com/eth-brownie/brownie/pull/1742))
+- update `docopt-ng` to support latest python ([#1738](https://github.com/eth-brownie/brownie/pull/1738))
+- `camelCase` to `snake_case` updates ([#1737](https://github.com/eth-brownie/brownie/pull/1737))
+
+## [1.20.0](https://github.com/eth-brownie/brownie/tree/v1.20.0) - 2024-02-02
+### Changed
+- Add support for Python 3.12, drop support for Python 3.9 ([#1735](https://github.com/eth-brownie/brownie/pull/1735))
+
+### Removed
+- Support for `pythx` ([#1733](https://github.com/eth-brownie/brownie/pull/1733))
+- Support for `ethpm` ([#1734](https://github.com/eth-brownie/brownie/pull/1734))
+
+## [1.19.5](https://github.com/eth-brownie/brownie/tree/v1.19.5) - 2024-01-31
+### Added
+- Support for custom / typed errors ([#1728](https://github.com/eth-brownie/brownie/pull/1728))
+
+### Changed
+- Default to EIP1559-style transactions on live networks ([#1727](https://github.com/eth-brownie/brownie/pull/1727))
+
+### Fixed
+- Readthedocs missing config file ([#1729](https://github.com/eth-brownie/brownie/pull/1729))
+
+## [1.19.4](https://github.com/eth-brownie/brownie/tree/v1.19.4) - 2024-01-29
+### Added
+- `viaIR` optimizer support ([#1572](https://github.com/eth-brownie/brownie/pull/1572))
+- Silent transactions when calling a contract ([#1636](https://github.com/eth-brownie/brownie/pull/1636))
+- Include encoded return data in transaction trace ([#1715](https://github.com/eth-brownie/brownie/pull/1715))
+- `--no-compile` flag to avoid project recompilation ([#1507](https://github.com/eth-brownie/brownie/pull/1507))
+- Support for various new EVM chains
+
+### Changed
+- set default vyper EVM version to `paris` ([#1684](https://github.com/eth-brownie/brownie/pull/1684))
+
+### Fixed
+- Force using utf-8 for reading contracts ([#1712](https://github.com/eth-brownie/brownie/pull/1712))
+- Fix verification for same named files ([#1677](https://github.com/eth-brownie/brownie/pull/1677))
+- `KeyError` when removing a contract ([#1689](https://github.com/eth-brownie/brownie/pull/1689))
+
+## [1.19.3](https://github.com/eth-brownie/brownie/tree/v1.19.3) - 2023-01-29
+### Added
+- Ganache 7.7.x support ([#1652](https://github.com/eth-brownie/brownie/pull/1652))
+
+### Fixed
+- Anvil support, you can now access trace, events and return_value for anvil transactions ([#1652](https://github.com/eth-brownie/brownie/pull/1652))
+- Removes `eth-abi` depreciation warnings ([#1639](https://github.com/eth-brownie/brownie/pull/1639))
+- Bump web3.py dep to support async provider in threaded applications ([#1664](https://github.com/eth-brownie/brownie/pull/1664))
+
+## [1.19.2](https://github.com/eth-brownie/brownie/tree/v1.19.2) - 2022-10-16
+### Added
+- Support for remappings in `from_explorer` ([#1596](https://github.com/eth-brownie/brownie/pull/1596))
+
+### Fixed
+- Handle Vyper immutables ([#1623](https://github.com/eth-brownie/brownie/pull/1623))
+- Correct Moonscan API for Moonbase Alpha testnet([#1611](https://github.com/eth-brownie/brownie/pull/1611))
+
+## [1.19.1](https://github.com/eth-brownie/brownie/tree/v1.19.1) - 2022-08-07
+### Fixed
+- Handle version bytecode for Vyper `>=0.3.4` ([#1578](https://github.com/eth-brownie/brownie/pull/1578))
+- Handle Vyper `>=0.3.4` coverage data generation breaking project compilation ([#1586](https://github.com/eth-brownie/brownie/pull/1586))
+- Handle null value of `to` field in transaction receipt so that contract deploying with Anvil works properly ([#1573](https://github.com/eth-brownie/brownie/pull/1573))
+- Avoid removing dependencies from the build ([#1564](https://github.com/eth-brownie/brownie/pull/1564))
+
+## [1.19.0](https://github.com/eth-brownie/brownie/tree/v1.19.0) - 2022-05-29
+### Added
+- Initial support for [Anvil](https://github.com/foundry-rs/foundry/tree/master/anvil), a blazing-fast local testnet node implementation in Rust ([#1541](https://github.com/eth-brownie/brownie/pull/1541))
+- Support configurable initial wallet balance, chain id, and gas limit.
+
+### Fixed
+- `StopIteration` when compiling some Vyper `v0.3.3` contracts ([#1547](https://github.com/eth-brownie/brownie/pull/1547))
+
+## [1.18.2](https://github.com/eth-brownie/brownie/tree/v1.18.2) - 2022-05-15
+### Added
+- Subscribe to events, with callbacks, using the corresponding contract instance ([#1453](https://github.com/eth-brownie/brownie/pull/1453))
+- Retrieve events that have occurred between two blocks using the corresponding contract instance ([#1453](https://github.com/eth-brownie/brownie/pull/1453))
+- Listening for an event using the associated contract instance ([#1453](https://github.com/eth-brownie/brownie/pull/1453))
+- Allow cache disabling when forking with ganache ([#1473](https://github.com/eth-brownie/brownie/pull/1473))
+- Detect 0xsplits clone proxies ([#1524](https://github.com/eth-brownie/brownie/pull/1524))
+
+### Fixed
+- Fix download of dependencies with special characters in tag/version ([#1470](https://github.com/eth-brownie/brownie/pull/1470))
+- Deepcopy config so that disconnecting and reconnecting to networks works fully ([#1466](https://github.com/eth-brownie/brownie/pull/1466))
+- Hardhat integration on Windows ([#1482](https://github.com/eth-brownie/brownie/pull/1482))
+- Handle equal sign in network RPC address ([#1450](https://github.com/eth-brownie/brownie/pull/1450))
+- `ReturnValue` comparison on tuples containing strings ([#1476](https://github.com/eth-brownie/brownie/pull/1476))
+- Ensure `.env` file exists on installed packages ([#1504](https://github.com/eth-brownie/brownie/pull/1504))
+- Bug when highlighting source code in GUI ([#1512](https://github.com/eth-brownie/brownie/pull/1512))
+- Bug when highlighting opcodes in GUI ([#1513](https://github.com/eth-brownie/brownie/pull/1513))
+
+## [1.18.1](https://github.com/eth-brownie/brownie/tree/v1.18.1) - 2022-02-15
+### Fixed
+- Correctly modify chain time when using `chain.mine` with Ganache v7 ([#1438](https://github.com/eth-brownie/brownie/pull/1438))
+- Ensure `.env` file exists for installed packages ([#1504](https://github.com/eth-brownie/brownie/pull/1504))
+
+## [1.18.0](https://github.com/eth-brownie/brownie/tree/v1.18.0) - 2022-02-14
+### Added
+- Support for Ganache v7 ([#1409](https://github.com/eth-brownie/brownie/pull/1409), [#1410](https://github.com/eth-brownie/brownie/pull/1410))
+- Add `override` argument to contract methods which allows changing the state before the call ([#1412](https://github.com/eth-brownie/brownie/pull/1412))
+- Allow to override EVM version per language ([#1418](https://github.com/eth-brownie/brownie/pull/1418))
+- Support for Alchemy via `WEB3_ALCHEMY_PROJECT_ID` environment var ([#1401](https://github.com/eth-brownie/brownie/pull/1401))
+- Support Ganache unlimited contract size ([#1424](https://github.com/eth-brownie/brownie/pull/1424))
+
+### Changed
+- Added a new solidity compiler setting `use_latest_patch` in `brownie-config.yaml` to use the latest patch version of a compiler based on the pragma version of the contract ([#1383](https://github.com/eth-brownie/brownie/pull/1383))
+- Add cli flag `-r` for raising exceptions to the caller instead of doing a system exit ([#1394](https://github.com/eth-brownie/brownie/pull/1394))
+
+### Fixed
+- Force files to be opened as UTF-8 ([#1377](https://github.com/eth-brownie/brownie/pull/1377))
+- Fix incremental compilation failing because of mismatching compiler versions ([#1411](https://github.com/eth-brownie/brownie/pull/1411))
+
+## [1.17.2](https://github.com/eth-brownie/brownie/tree/v1.17.2) - 2021-12-04
+### Changed
+- Bump deps to support vyper `v0.3.1`
+
+### Fixed
+- Support linked libraries in source verification ([#1335](https://github.com/eth-brownie/brownie/pull/1335))
+- Check for regex match when locating contract names in source ([#1363](https://github.com/eth-brownie/brownie/pull/1363))
+
+## [1.17.1](https://github.com/eth-brownie/brownie/tree/v1.17.1) - 2021-11-07
+### Added
+- Add support for `ARBISCAN_TOKEN` env var ([#1319](https://github.com/eth-brownie/brownie/pull/1319))
+- Add Avalanche to default networks and support for snowtrace ([#1332](https://github.com/eth-brownie/brownie/pull/1332))
+
+### Changed
+- Transactions are rebroadcasted until they appear in the mempool ([#1327](https://github.com/eth-brownie/brownie/pull/1327))
+- Avoid caching on chains with short blocktimes ([#1297](https://github.com/eth-brownie/brownie/pull/1297))
+
+### Fixed
+- Match single/double quote paths in source verification ([#1323](https://github.com/eth-brownie/brownie/pull/1323))
+- Change use of `getcontext()` ([#1310](https://github.com/eth-brownie/brownie/pull/1310))
+- IPv6-aware Hardhat ([#1309](https://github.com/eth-brownie/brownie/pull/1309))
+
+## [1.17.0](https://github.com/eth-brownie/brownie/tree/v1.17.0) - 2021-10-13
+### Added
+- Arguments from the command line can now be passed to brownie scripts. ([#398](https://github.com/eth-brownie/brownie/issues/398))
+- Fix etherscan verification w/ new solidity flattener ([#1283](https://github.com/eth-brownie/brownie/pull/1283))
+- Drop py36 support and add py39 to CI/dev tooling ([#1289](https://github.com/eth-brownie/brownie/pull/1289))
+- Bump dependencies ([#1277](https://github.com/eth-brownie/brownie/pull/1277))
+- Fix missing source in source object, grab from filesystem ([#1290](https://github.com/eth-brownie/brownie/pull/1290))
+- Add harmony mainnet to default network config([#1286](https://github.com/eth-brownie/brownie/pull/1286))
+- Better panic messages for contract calls ([#1275](https://github.com/eth-brownie/brownie/pull/1275))
+
+### Fixed
+- Handle missing `gasPrice` in `eth_getTransaction` ([#1285](https://github.com/eth-brownie/brownie/pull/1285))
+
+## [1.16.4](https://github.com/eth-brownie/brownie/tree/v1.16.4) - 2021-09-21
+### Added
+- Add `only_confirmed` as an optional kwarg for `history.clear` ([#1251](https://github.com/eth-brownie/brownie/pull/1251))
+- Add `.env` to default project gitignore ([#1249](https://github.com/eth-brownie/brownie/pull/1249))
+
+### Changed
+- Allow numbers in project names ([#1254](https://github.com/eth-brownie/brownie/pull/1254))
+
+### Fixed
+- Various Arbitrum related fixes ([#1255](https://github.com/eth-brownie/brownie/pull/1255))
+- Pass solc version when compiling ABI ([#1243](https://github.com/eth-brownie/brownie/pull/1243))
+- Correctly handle Erigon traces ([#1245](https://github.com/eth-brownie/brownie/pull/1245))
+- Replace EIP1559 tx's with the same tx type ([#1250](https://github.com/eth-brownie/brownie/pull/1250))
+
+## [1.16.3](https://github.com/eth-brownie/brownie/tree/v1.16.3) - 2021-09-04
+### Added
+- Add API token to verify sources on ftmscan ([#1226](https://github.com/eth-brownie/brownie/pull/1226))
+- Add `arbitrum-main` to default networks in `network-config.yaml` ([#1235](https://github.com/eth-brownie/brownie/pull/1235))
+
+### Fixed
+- Prevent brownie from crashing when skipping tests with -s ([#1220](https://github.com/eth-brownie/brownie/pull/1220))
+- Thread safety for `multicall` ([#1233](https://github.com/eth-brownie/brownie/pull/1233))
+
+## [1.16.2](https://github.com/eth-brownie/brownie/tree/v1.16.2) - 2021-08-24
+### Added
+- Allow specifying password when saving an account ([#1216](https://github.com/eth-brownie/brownie/pull/1216))
+
+### Fixed
+- Hardhat revert string format ([#1218](https://github.com/eth-brownie/brownie/pull/1218))
+- Clef formatter for EIP-1559 transactions ([#1211](https://github.com/eth-brownie/brownie/pull/1211))
+
+## [1.16.1](https://github.com/eth-brownie/brownie/tree/v1.16.1) - 2021-08-16
+### Added
+- Set default values for `max_fee` and `priority_fee` ([#1206](https://github.com/eth-brownie/brownie/pull/1206))
+
 ### Fixed
 - Recursively kill all RPC child processes on exit ([#1200](https://github.com/eth-brownie/brownie/pull/1200))
 - Issue with testing reverted contracts not found in deployment map ([#1195](https://github.com/eth-brownie/brownie/pull/1195))
 - Fix issue with missing contracts in coverage report ([#1178](https://github.com/eth-brownie/brownie/pull/1178))
+- Use `eth.get_block` to avoid deprecated method warning ([#1203](https://github.com/eth-brownie/brownie/pull/1203))
+- Correctly handle functions outside contracts when generating pcMap ([#1205](https://github.com/eth-brownie/brownie/pull/1205))
 
 ## [1.16.0](https://github.com/eth-brownie/brownie/tree/v1.16.0) - 2021-08-08
 ### Added

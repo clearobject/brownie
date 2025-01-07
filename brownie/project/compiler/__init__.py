@@ -4,7 +4,7 @@ import json
 from copy import deepcopy
 from hashlib import sha1
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, Union
 
 import solcast
 from eth_utils import remove_0x_prefix
@@ -39,11 +39,6 @@ STANDARD_JSON: Dict = {
         "remappings": [],
     },
 }
-EVM_SOLC_VERSIONS = [
-    ("istanbul", Version("0.5.13")),
-    ("petersburg", Version("0.5.5")),
-    ("byzantium", Version("0.4.0")),
-]
 
 
 def compile_and_format(
@@ -52,12 +47,13 @@ def compile_and_format(
     vyper_version: Optional[str] = None,
     optimize: bool = True,
     runs: int = 200,
-    evm_version: Optional[str] = None,
+    evm_version: Optional[Union[str, Dict[str, str]]] = None,
     silent: bool = True,
     allow_paths: Optional[str] = None,
     interface_sources: Optional[Dict[str, str]] = None,
     remappings: Optional[list] = None,
     optimizer: Optional[Dict] = None,
+    viaIR: Optional[bool] = None,
 ) -> Dict:
     """Compiles contracts and returns build data.
 
@@ -72,6 +68,7 @@ def compile_and_format(
         interface_sources: dictionary of interfaces as {'path': "source code"}
         remappings: list of solidity path remappings
         optimizer: dictionary of solidity optimizer settings
+        viaIR: enable compilation pipeline to go through the Yul intermediate representation
 
     Returns:
         build data dict
@@ -131,11 +128,12 @@ def compile_and_format(
 
         input_json = generate_input_json(
             to_compile,
-            evm_version=evm_version,
+            evm_version=evm_version[language] if isinstance(evm_version, dict) else evm_version,
             language=language,
             interface_sources=interfaces,
             remappings=remappings,
             optimizer=optimizer,
+            viaIR=viaIR,
         )
 
         output_json = compile_from_input_json(input_json, silent, allow_paths)
@@ -153,8 +151,8 @@ def generate_input_json(
     interface_sources: Optional[Dict[str, str]] = None,
     remappings: Optional[list] = None,
     optimizer: Optional[Dict] = None,
+    viaIR: Optional[bool] = None,
 ) -> Dict:
-
     """Formats contracts to the standard solc input json.
 
     Args:
@@ -166,6 +164,7 @@ def generate_input_json(
         interface_sources: dictionary of interfaces as {'path': "source code"}
         remappings: list of solidity path remappings
         optimizer: dictionary of solidity optimizer settings
+        viaIR: enable compilation pipeline to go through the Yul intermediate representation
 
     Returns: dict
     """
@@ -177,10 +176,10 @@ def generate_input_json(
         optimizer = {"enabled": optimize, "runs": runs if optimize else 0}
 
     if evm_version is None:
-        if language == "Solidity":
-            evm_version = next(i[0] for i in EVM_SOLC_VERSIONS if solidity.get_version() >= i[1])
-        else:
-            evm_version = "istanbul"
+        _module = solidity if language == "Solidity" else vyper
+        evm_version = next(
+            i[0] for i in _module.EVM_VERSION_MAPPING if _module.get_version() >= i[1]
+        )
 
     input_json: Dict = deepcopy(STANDARD_JSON)
     input_json["language"] = language
@@ -188,6 +187,8 @@ def generate_input_json(
     if language == "Solidity":
         input_json["settings"]["optimizer"] = optimizer
         input_json["settings"]["remappings"] = _get_solc_remappings(remappings)
+        if viaIR is not None:
+            input_json["settings"]["viaIR"] = viaIR
     input_json["sources"] = _sources_dict(contract_sources, language)
 
     if interface_sources:
@@ -214,7 +215,7 @@ def _get_solc_remappings(remappings: Optional[list]) -> list:
             remapped_dict[key] = path.parent.joinpath(remap_dict.pop(key)).as_posix()
         else:
             remapped_dict[path.name] = path.as_posix()
-    for (k, v) in remap_dict.items():
+    for k, v in remap_dict.items():
         if packages.joinpath(v).exists():
             remapped_dict[k] = packages.joinpath(v).as_posix()
 
@@ -236,7 +237,6 @@ def _get_allow_paths(allow_paths: Optional[str], remappings: list) -> str:
 def compile_from_input_json(
     input_json: Dict, silent: bool = True, allow_paths: Optional[str] = None
 ) -> Dict:
-
     """
     Compiles contracts from a standard input json.
 
@@ -294,7 +294,7 @@ def generate_build_json(
         if path_str in input_json["sources"]:
             source = input_json["sources"][path_str]["content"]
         else:
-            with Path(path_str).open() as fp:
+            with Path(path_str).open(encoding="utf-8") as fp:
                 source = fp.read()
             contract_alias = _get_alias(contract_name, path_str)
 
@@ -377,6 +377,7 @@ def _sources_dict(original: Dict, language: str) -> Dict:
 
 def get_abi(
     contract_sources: Dict[str, str],
+    solc_version: Optional[str] = None,
     allow_paths: Optional[str] = None,
     remappings: Optional[list] = None,
     silent: bool = True,
@@ -388,6 +389,7 @@ def get_abi(
     ---------
     contract_sources : dict
         a dictionary in the form of {'path': "source code"}
+    solc_version: solc version to compile with (use None to set via pragmas)
     allow_paths : str, optional
         Compiler allowed filesystem import path
     remappings : list, optional
@@ -438,7 +440,10 @@ def get_abi(
     if not solc_sources:
         return final_output
 
-    compiler_targets = find_solc_versions(solc_sources, install_needed=True, silent=silent)
+    if solc_version:
+        compiler_targets = {solc_version: list(solc_sources)}
+    else:
+        compiler_targets = find_solc_versions(solc_sources, install_needed=True, silent=silent)
 
     for version, path_list in compiler_targets.items():
         to_compile = {k: v for k, v in contract_sources.items() if k in path_list}

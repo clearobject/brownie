@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-
+import copy
 import json
 import os
 import re
@@ -19,12 +19,12 @@ from hypothesis.database import DirectoryBasedExampleDatabase
 from brownie._expansion import expand_posix_vars
 from brownie._singleton import _Singleton
 
-__version__ = "1.16.0"
+__version__ = "1.20.7"
 
 BROWNIE_FOLDER = Path(__file__).parent
 DATA_FOLDER = Path.home().joinpath(".brownie")
 
-DATA_SUBFOLDERS = ("accounts", "ethpm", "packages")
+DATA_SUBFOLDERS = ("accounts", "packages")
 
 EVM_EQUIVALENTS = {"atlantis": "byzantium", "agharta": "petersburg"}
 
@@ -73,7 +73,7 @@ class ConfigContainer:
         if id_ is None:
             id_ = self.settings["networks"]["default"]
 
-        network = self.networks[id_].copy()
+        network = copy.deepcopy(self.networks[id_])
         key = "development" if "cmd" in network else "live"
         network["settings"] = self.settings["networks"][key].copy()
 
@@ -179,7 +179,7 @@ def _load_config(project_path: Path) -> Dict:
 
     with path.open() as fp:
         if path.suffix in (".yaml", ".yml"):
-            return yaml.safe_load(fp)
+            return yaml.safe_load(fp) or {}
         raw_json = fp.read()
     valid_json = re.sub(r'\/\/[^"]*?(?=\n|$)', "", raw_json)
     return json.loads(valid_json)
@@ -331,6 +331,12 @@ def _make_data_folders(data_folder: Path) -> None:
         shutil.copyfile(
             BROWNIE_FOLDER.joinpath("data/network-config.yaml"),
             data_folder.joinpath("network-config.yaml"),
+        )
+
+    if not data_folder.joinpath("providers-config.yaml").exists():
+        shutil.copyfile(
+            BROWNIE_FOLDER.joinpath("data/providers-config.yaml"),
+            data_folder.joinpath("providers-config.yaml"),
         )
 
 

@@ -12,7 +12,7 @@ from brownie.utils.docopt import docopt
 __doc__ = """Usage: brownie pm <command> [<arguments> ...] [options]
 
 Commands:
-  list                          List available accounts
+  list                          List installed packages
   install <uri> [version]       Install a new package
   clone <id> [path]             Make a copy of an installed package
   delete <id>                   Delete an installed package
@@ -20,7 +20,7 @@ Commands:
 Options:
   --help -h                     Display this message
 
-Manager for packages installed from ethPM and Github. Installed packages can
+Manager for packages installed from Github. Installed packages can
 be added as dependencies and imported into your own projects.
 
 See https://eth-brownie.readthedocs.io/en/stable/package-manager.html for

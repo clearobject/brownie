@@ -5,6 +5,7 @@ import threading
 import time
 import weakref
 from hashlib import sha1
+from pathlib import Path
 from sqlite3 import OperationalError
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
 
@@ -14,7 +15,7 @@ from web3.types import BlockData
 from brownie._config import CONFIG, _get_data_folder
 from brownie._singleton import _Singleton
 from brownie.convert import Wei
-from brownie.exceptions import BrownieEnvironmentError
+from brownie.exceptions import BrownieEnvironmentError, CompilerError
 from brownie.network import rpc
 from brownie.project.build import DEPLOYMENT_KEYS
 from brownie.utils.sql import Cursor
@@ -30,7 +31,6 @@ cur.execute("CREATE TABLE IF NOT EXISTS sources (hash PRIMARY KEY, source)")
 
 
 class TxHistory(metaclass=_Singleton):
-
     """List-like singleton container that contains TransactionReceipt objects.
     Whenever a transaction is broadcast, the TransactionReceipt is automatically
     added to this container."""
@@ -77,8 +77,19 @@ class TxHistory(metaclass=_Singleton):
         if tx not in self._list:
             self._list.append(tx)
 
-    def clear(self) -> None:
-        self._list.clear()
+    def clear(self, only_confirmed: bool = False) -> None:
+        """
+        Clear the list.
+
+        Arguments
+        ---------
+        only_confirmed : bool, optional
+            If True, transactions which are still marked as pending will not be removed.
+        """
+        if only_confirmed:
+            self._list = [i for i in self._list if i.status == -1]
+        else:
+            self._list.clear()
 
     def copy(self) -> List:
         """Returns a shallow copy of the object as a list"""
@@ -175,7 +186,6 @@ class TxHistory(metaclass=_Singleton):
 
 
 class Chain(metaclass=_Singleton):
-
     """
     List-like singleton used to access block data, and perform actions such as
     snapshotting, mining, and chain rewinds.
@@ -555,7 +565,7 @@ def _find_contract(address: Any) -> Any:
             from brownie.network.contract import Contract
 
             return Contract(address)
-        except ValueError:
+        except (ValueError, CompilerError):
             pass
 
 
@@ -571,14 +581,14 @@ def _add_contract(contract: Any) -> None:
 
 
 def _remove_contract(contract: Any) -> None:
-    del _contract_map[contract.address]
+    _contract_map.pop(contract.address, None)
 
 
 def _get_deployment(
     address: str = None, alias: str = None
 ) -> Tuple[Optional[Dict], Optional[Dict]]:
     if address and alias:
-        raise
+        raise ValueError("Passed both params address and alias, should be only one!")
     if address:
         address = _resolve_address(address)
         query = f"address='{address}'"
@@ -622,12 +632,52 @@ def _add_deployment(contract: Any, alias: Optional[str] = None) -> None:
         f"(address UNIQUE, alias UNIQUE, paths, {', '.join(DEPLOYMENT_KEYS)})"
     )
 
+    if "compiler" not in contract._build:
+        # do not replace full contract artifacts with ABI-only ones
+        row = cur.fetchone(f"SELECT compiler FROM {name} WHERE address=?", (address,))
+        if row and row[0]:
+            return
+
     all_sources = {}
     for key, path in contract._build.get("allSourcePaths", {}).items():
         source = contract._sources.get(path)
+        if source is None:
+            source = Path(path).read_text()
         hash_ = sha1(source.encode()).hexdigest()
         cur.insert("sources", hash_, source)
         all_sources[key] = [hash_, path]
 
     values = [contract._build.get(i) for i in DEPLOYMENT_KEYS]
     cur.insert(name, address, alias, all_sources, *values)
+
+
+def _remove_deployment(
+    address: str = None, alias: str = None
+) -> Tuple[Optional[Dict], Optional[Dict]]:
+    if address and alias:
+        raise ValueError("Passed both params address and alias, should be only one!")
+    if address:
+        address = _resolve_address(address)
+        query = f"address='{address}'"
+    elif alias:
+        query = f"alias='{alias}'"
+
+    try:
+        name = f"chain{CONFIG.active_network['chainid']}"
+    except KeyError:
+        raise BrownieEnvironmentError("Functionality not available in local environment") from None
+
+    build_json, sources = _get_deployment(address, alias)
+    # delete entry from chain{n}
+    cur.execute(f"DELETE FROM {name} WHERE {query}")
+    # delete all entries from sources matching the contract's source hashes
+    contract = _find_contract(address)
+    if contract:
+        for key, path in contract._build.get("allSourcePaths", {}).items():
+            source = contract._sources.get(path)
+            if source is None:
+                source = Path(path).read_text()
+            hash_ = sha1(source.encode()).hexdigest()
+            cur.execute(f"DELETE FROM sources WHERE hash='{hash_}'")
+
+    return build_json, sources

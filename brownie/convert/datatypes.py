@@ -4,6 +4,11 @@ from copy import deepcopy
 from decimal import Decimal, getcontext
 from typing import Any, Dict, ItemsView, KeysView, List, Optional, Sequence, TypeVar, Union
 
+try:
+    from vyper.exceptions import DecimalOverrideException
+except ImportError:
+    DecimalOverrideException = BaseException  # regular catch blocks shouldn't catch
+
 import eth_utils
 from hexbytes import HexBytes
 
@@ -26,7 +31,6 @@ WeiInputTypes = TypeVar("WeiInputTypes", str, float, int, None)
 
 
 class Wei(int):
-
     """Integer subclass that converts a value to wei and allows comparison against
     similarly formatted values.
 
@@ -120,7 +124,6 @@ def _return_int(original: Any, value: Any) -> int:
 
 
 class Fixed(Decimal):
-
     """
     Decimal subclass that allows comparison against strings, integers and Wei.
 
@@ -182,15 +185,18 @@ def _to_fixed(value: Any) -> Decimal:
         except TypeError:
             pass
     try:
-        ctx = getcontext()
-        ctx.prec = 100
-        return Decimal(value, context=ctx)
-    except Exception:
-        raise TypeError(f"Cannot convert {type(value).__name__} '{value}' to decimal.")
+        try:
+            # until vyper v0.3.1 we can mess with the precision
+            ctx = getcontext()
+            ctx.prec = 78
+        except DecimalOverrideException:
+            pass  # vyper set the precision, do nothing.
+        return Decimal(value)
+    except Exception as e:
+        raise TypeError(f"Cannot convert {type(value).__name__} '{value}' to decimal.") from e
 
 
 class EthAddress(str):
-
     """String subclass that raises TypeError when compared to a non-address."""
 
     def __new__(cls, value: Union[bytes, str]) -> str:
@@ -222,7 +228,6 @@ def _address_compare(a: Any, b: Any) -> bool:
 
 
 class HexString(bytes):
-
     """Bytes subclass for hexstring comparisons. Raises TypeError if compared to
     a non-hexstring. Evaluates True for hexstrings with the same value but differing
     leading zeros or capitalization."""
@@ -298,14 +303,23 @@ class ReturnValue(tuple):
                         values[i] = ReturnValue(values[i], abi[i]["components"])
                     else:
                         # array of tuples
-                        values[i] = ReturnValue(values[i], [abi[i]] * len(values[i]))
+                        inner_abi = abi[i].copy()
+                        inner_abi["type"] = inner_abi["type"].rsplit("[", maxsplit=1)[0]
+                        final_abi = [deepcopy(inner_abi) for i in range(len(values[i]))]
+                        if inner_abi.get("name"):
+                            name = inner_abi["name"]
+                            for x in range(len(final_abi)):
+                                final_abi[x]["name"] = f"{name}[{x}]"
+
+                        values[i] = ReturnValue(values[i], final_abi)
                 else:
                     # array
                     values[i] = ReturnValue(values[i])
 
         self = super().__new__(cls, values)  # type: ignore
         self._abi = abi or []
-        self._dict = {i["name"]: values[c] for c, i in enumerate(self._abi) if i["name"]}
+        self._dict = {i.get("name", "") or f"arg[{c}]": values[c] for c, i in enumerate(self._abi)}
+
         return self
 
     def __hash__(self) -> int:
@@ -344,7 +358,13 @@ class ReturnValue(tuple):
 
     def dict(self) -> Dict:
         """ReturnValue.dict() -> a dictionary of ReturnValue's named items"""
-        return self._dict  # type: ignore
+        response = {}
+        for k, v in self._dict.items():
+            if isinstance(v, ReturnValue) and v._abi:
+                response[k] = v.dict()
+            else:
+                response[k] = v
+        return response
 
     def index(self, value: Any, start: int = 0, stop: Any = None) -> int:
         """ReturnValue.index(value, [start, [stop]]) -> integer -- return first index of value.
@@ -392,5 +412,5 @@ def _convert_str(value: Any) -> Wei:
         return value
     try:
         return Wei(value)
-    except ValueError:
+    except (ValueError, TypeError):
         return value

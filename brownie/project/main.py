@@ -3,6 +3,7 @@
 import importlib
 import json
 import os
+import re
 import shutil
 import sys
 import warnings
@@ -13,7 +14,7 @@ from io import BytesIO
 from pathlib import Path
 from types import ModuleType
 from typing import Any, Dict, Iterator, KeysView, List, Optional, Set, Tuple, Union
-from urllib.parse import urlparse
+from urllib.parse import quote
 
 import requests
 import yaml
@@ -34,13 +35,13 @@ from brownie._config import (
 )
 from brownie._expansion import expand_posix_vars
 from brownie.exceptions import (
+    BadProjectName,
     BrownieEnvironmentWarning,
     InvalidPackage,
     PragmaError,
     ProjectAlreadyLoaded,
     ProjectNotFound,
 )
-from brownie.network import web3
 from brownie.network.contract import (
     Contract,
     ContractContainer,
@@ -48,9 +49,8 @@ from brownie.network.contract import (
     ProjectContract,
 )
 from brownie.network.state import _add_contract, _remove_contract, _revert_register
-from brownie.project import compiler, ethpm
+from brownie.project import compiler
 from brownie.project.build import BUILD_KEYS, INTERFACE_KEYS, Build
-from brownie.project.ethpm import get_deployment_addresses, get_manifest
 from brownie.project.sources import Sources, get_pragma_spec
 from brownie.utils import notify
 
@@ -58,6 +58,7 @@ BUILD_FOLDERS = ["contracts", "deployments", "interfaces"]
 MIXES_URL = "https://github.com/brownie-mix/{}-mix/archive/{}.zip"
 
 GITIGNORE = """__pycache__
+.env
 .history
 .hypothesis/
 build/
@@ -89,17 +90,23 @@ class _ProjectBase:
             os.chdir(self._path)
 
         try:
+            project_evm_version = compiler_config["evm_version"]
+            evm_version = {
+                "Solidity": compiler_config["solc"].get("evm_version", project_evm_version),
+                "Vyper": compiler_config["vyper"].get("evm_version", project_evm_version),
+            }
             build_json = compiler.compile_and_format(
                 contract_sources,
                 solc_version=compiler_config["solc"].get("version", None),
                 vyper_version=compiler_config["vyper"].get("version", None),
                 optimize=compiler_config["solc"].get("optimize", None),
                 runs=compiler_config["solc"].get("runs", None),
-                evm_version=compiler_config["evm_version"],
+                evm_version=evm_version,
                 silent=silent,
                 allow_paths=allow_paths,
                 remappings=compiler_config["solc"].get("remappings", []),
                 optimizer=compiler_config["solc"].get("optimizer", None),
+                viaIR=compiler_config["solc"].get("viaIR", None),
             )
         finally:
             os.chdir(cwd)
@@ -155,7 +162,6 @@ class _ProjectBase:
 
 
 class Project(_ProjectBase):
-
     """
     Top level dict-like container that holds data and objects related to
     a brownie project.
@@ -167,7 +173,7 @@ class Project(_ProjectBase):
         _build: project Build object
     """
 
-    def __init__(self, name: str, project_path: Path) -> None:
+    def __init__(self, name: str, project_path: Path, compile: bool = True) -> None:
         self._path: Path = project_path
         self._envvars = _load_project_envvars(project_path)
         self._structure = expand_posix_vars(
@@ -177,13 +183,15 @@ class Project(_ProjectBase):
 
         self._name = name
         self._active = False
-        self.load()
+        self.load(compile=compile)
 
-    def load(self) -> None:
+    def load(self, raise_if_loaded: bool = True, compile: bool = True) -> None:
         """Compiles the project contracts, creates ContractContainer objects and
         populates the namespace."""
         if self._active:
-            raise ProjectAlreadyLoaded("Project is already active")
+            if raise_if_loaded:
+                raise ProjectAlreadyLoaded("Project is already active")
+            return None
 
         contract_sources = _load_sources(self._path, self._structure["contracts"], False)
         interface_sources = _load_sources(self._path, self._structure["interfaces"], True)
@@ -191,14 +199,18 @@ class Project(_ProjectBase):
         self._build = Build(self._sources)
 
         contract_list = self._sources.get_contract_list()
+        potential_dependencies = []
         for path in list(self._build_path.glob("contracts/*.json")):
             try:
                 with path.open() as fp:
                     build_json = json.load(fp)
             except json.JSONDecodeError:
                 build_json = {}
-            if not set(BUILD_KEYS).issubset(build_json) or path.stem not in contract_list:
+            if not set(BUILD_KEYS).issubset(build_json):
                 path.unlink()
+                continue
+            if path.stem not in contract_list:
+                potential_dependencies.append((path, build_json))
                 continue
             if isinstance(build_json["allSourcePaths"], list):
                 # this handles the format change in v1.7.0, it can be removed in a future release
@@ -211,6 +223,14 @@ class Project(_ProjectBase):
                 path.unlink()
                 continue
             self._build._add_contract(build_json)
+
+        for path, build_json in potential_dependencies:
+            dependents = self._build.get_dependents(path.stem)
+            is_dependency = len(set(dependents) & set(contract_list)) > 0
+            if is_dependency:
+                self._build._add_contract(build_json)
+            else:
+                path.unlink()
 
         interface_hashes = {}
         interface_list = self._sources.get_interface_list()
@@ -226,14 +246,15 @@ class Project(_ProjectBase):
             self._build._add_interface(build_json)
             interface_hashes[path.stem] = build_json["sha1"]
 
-        self._compiler_config = expand_posix_vars(
-            _load_project_compiler_config(self._path), self._envvars
-        )
+        if compile:
+            self._compiler_config = expand_posix_vars(
+                _load_project_compiler_config(self._path), self._envvars
+            )
 
-        # compile updated sources, update build
-        changed = self._get_changed_contracts(interface_hashes)
-        self._compile(changed, self._compiler_config, False)
-        self._compile_interfaces(interface_hashes)
+            # compile updated sources, update build
+            changed = self._get_changed_contracts(interface_hashes)
+            self._compile(changed, self._compiler_config, False)
+            self._compile_interfaces(interface_hashes)
         self._load_dependency_artifacts()
 
         self._create_containers()
@@ -288,16 +309,18 @@ class Project(_ProjectBase):
         if build_json["sha1"] != sha1(source.encode()).hexdigest():
             return True
         # compare compiler settings
-        if _compare_settings(config, build_json["compiler"]):
-            return True
         if build_json["language"] == "Solidity":
             # compare solc-specific compiler settings
             solc_config = config["solc"].copy()
             solc_config["remappings"] = None
-            if _compare_settings(solc_config, build_json["compiler"]):
+            if not _solidity_compiler_equal(solc_config, build_json["compiler"]):
                 return True
             # compare solc pragma against compiled version
             if Version(build_json["compiler"]["version"]) not in get_pragma_spec(source):
+                return True
+        else:
+            vyper_config = config["vyper"].copy()
+            if not _vyper_compiler_equal(vyper_config, build_json["compiler"]):
                 return True
         return False
 
@@ -315,6 +338,7 @@ class Project(_ProjectBase):
         changed_sources = {i: self._sources.get(i) for i in changed_paths}
         abi_json = compiler.get_abi(
             changed_sources,
+            solc_version=self._compiler_config["solc"].get("version", None),
             allow_paths=self._path.as_posix(),
             remappings=self._compiler_config["solc"].get("remappings", []),
         )
@@ -519,7 +543,6 @@ class Project(_ProjectBase):
 
 
 class TempProject(_ProjectBase):
-
     """Simplified Project class used to hold temporary contracts that are
     compiled via project.compile_source"""
 
@@ -618,26 +641,6 @@ def from_brownie_mix(
     return str(project_path)
 
 
-def from_ethpm(uri: str) -> "TempProject":
-
-    """
-    Generates a TempProject from an ethPM package.
-    """
-
-    manifest = get_manifest(uri)
-    compiler_config = {
-        "evm_version": None,
-        "solc": {"version": None, "optimize": True, "runs": 200},
-        "vyper": {"version": None},
-    }
-    project = TempProject(manifest["package_name"], manifest["sources"], compiler_config)
-    if web3.isConnected():
-        for contract_name in project.keys():
-            for address in get_deployment_addresses(manifest, contract_name):
-                project[contract_name].at(address)
-    return project
-
-
 def compile_source(
     source: str,
     solc_version: Optional[str] = None,
@@ -696,7 +699,12 @@ def compile_source(
         raise exc
 
 
-def load(project_path: Union[Path, str, None] = None, name: Optional[str] = None) -> "Project":
+def load(
+    project_path: Union[Path, str, None] = None,
+    name: Optional[str] = None,
+    raise_if_loaded: bool = True,
+    compile: bool = True,
+) -> "Project":
     """Loads a project and instantiates various related objects.
 
     Args:
@@ -733,16 +741,22 @@ def load(project_path: Union[Path, str, None] = None, name: Optional[str] = None
         name = project_path.name
         if not name.lower().endswith("project"):
             name += " project"
-        name = "".join(i for i in name.title() if i.isalpha())
-    if next((True for i in _loaded_projects if i._name == name), False):
-        raise ProjectAlreadyLoaded("There is already a project loaded with this name")
+        if not name[0].isalpha():
+            raise BadProjectName("Project must start with an alphabetic character")
+        name = "".join(i for i in name.title() if i.isalnum())
+
+    for loaded_project in _loaded_projects:
+        if loaded_project._name == name:
+            if raise_if_loaded:
+                raise ProjectAlreadyLoaded("There is already a project loaded with this name")
+            return loaded_project
 
     # paths
     _create_folders(project_path)
     _add_to_sys_path(project_path)
 
     # load sources and build
-    return Project(name, project_path)
+    return Project(name, project_path, compile=compile)
 
 
 def _install_dependencies(path: Path) -> None:
@@ -760,41 +774,14 @@ def install_package(package_id: str) -> str:
     Arguments
     ---------
     package_id : str
-        Package ID or ethPM URI.
+        Package ID
 
     Returns
     -------
     str
         ID of the installed package.
     """
-    if urlparse(package_id).scheme in ("erc1319", "ethpm"):
-        return _install_from_ethpm(package_id)
-    else:
-        return _install_from_github(package_id)
-
-
-def _install_from_ethpm(uri: str) -> str:
-    manifest = get_manifest(uri)
-    org = manifest["meta_brownie"]["registry_address"]
-    repo = manifest["package_name"]
-    version = manifest["version"]
-
-    install_path = _get_data_folder().joinpath(f"packages/{org}")
-    install_path.mkdir(exist_ok=True)
-    install_path = install_path.joinpath(f"{repo}@{version}")
-    if install_path.exists():
-        raise FileExistsError("Package is aleady installed")
-
-    try:
-        new(str(install_path), ignore_existing=True)
-        ethpm.install_package(install_path, uri)
-        project = load(install_path)
-        project.close()
-    except Exception as e:
-        shutil.rmtree(install_path)
-        raise e
-
-    return f"{org}/{repo}@{version}"
+    return _install_from_github(package_id)
 
 
 def _maybe_retrieve_github_auth() -> Dict[str, str]:
@@ -811,7 +798,7 @@ def _maybe_retrieve_github_auth() -> Dict[str, str]:
 
 def _install_from_github(package_id: str) -> str:
     try:
-        path, version = package_id.split("@")
+        path, version = package_id.split("@", 1)
         org, repo = path.split("/")
     except ValueError:
         raise ValueError(
@@ -829,6 +816,71 @@ def _install_from_github(package_id: str) -> str:
     headers = REQUEST_HEADERS.copy()
     headers.update(_maybe_retrieve_github_auth())
 
+    if re.match(r"^[0-9a-f]+$", version):
+        download_url = f"https://api.github.com/repos/{org}/{repo}/zipball/{version}"
+    else:
+        download_url = _get_download_url_from_tag(org, repo, version, headers)
+
+    existing = list(install_path.parent.iterdir())
+
+    # Some versions contain special characters and github api seems to display url without
+    # encoding them.
+    # It results in a ConnectionError exception because the actual download url is encoded.
+    # In this case we try to sanitize the version in url and download again.
+    try:
+        _stream_download(download_url, str(install_path.parent), headers)
+    except ConnectionError:
+        download_url = (
+            f"https://api.github.com/repos/{org}/{repo}/zipball/refs/tags/{quote(version)}"
+        )
+        _stream_download(download_url, str(install_path.parent), headers)
+
+    installed = next(i for i in install_path.parent.iterdir() if i not in existing)
+    shutil.move(installed, install_path)
+
+    try:
+        if not install_path.joinpath("brownie-config.yaml").exists():
+            brownie_config: Dict = {"project_structure": {}}
+
+            contract_paths = set(
+                i.relative_to(install_path).parts[0] for i in install_path.glob("**/*.sol")
+            )
+            contract_paths.update(
+                i.relative_to(install_path).parts[0] for i in install_path.glob("**/*.vy")
+            )
+            if not contract_paths:
+                raise InvalidPackage(f"{package_id} does not contain any .sol or .vy files")
+            if install_path.joinpath("contracts").is_dir():
+                brownie_config["project_structure"]["contracts"] = "contracts"
+            elif len(contract_paths) == 1:
+                brownie_config["project_structure"]["contracts"] = contract_paths.pop()
+            else:
+                raise Exception(
+                    f"{package_id} has no `contracts/` subdirectory, and "
+                    "multiple directories containing source files"
+                )
+
+            with install_path.joinpath("brownie-config.yaml").open("w") as fp:
+                yaml.dump(brownie_config, fp)
+
+            Path.touch(install_path / ".env")
+
+        project = load(install_path)
+        project.close()
+    except InvalidPackage:
+        shutil.rmtree(install_path)
+        raise
+    except Exception as e:
+        notify(
+            "WARNING",
+            f"Unable to compile {package_id} due to a {type(e).__name__} - you may still be able to"
+            " import sources from the package, but will be unable to load the package directly.\n",
+        )
+
+    return f"{org}/{repo}@{version}"
+
+
+def _get_download_url_from_tag(org: str, repo: str, version: str, headers: dict) -> str:
     response = requests.get(
         f"https://api.github.com/repos/{org}/{repo}/tags?per_page=100", headers=headers
     )
@@ -855,52 +907,7 @@ def _install_from_github(package_id: str) -> str:
             "Invalid version for this package. Available versions are:\n" + ", ".join(tags)
         ) from None
 
-    download_url = next(i["zipball_url"] for i in data if i["name"].lstrip("v") == version)
-
-    existing = list(install_path.parent.iterdir())
-    _stream_download(download_url, str(install_path.parent), headers)
-
-    installed = next(i for i in install_path.parent.iterdir() if i not in existing)
-    shutil.move(installed, install_path)
-
-    try:
-        if not install_path.joinpath("brownie-config.yaml").exists():
-            brownie_config: Dict = {"project_structure": {}}
-
-            contract_paths = set(
-                i.relative_to(install_path).parts[0] for i in install_path.glob("**/*.sol")
-            )
-            contract_paths.update(
-                i.relative_to(install_path).parts[0] for i in install_path.glob("**/*.vy")
-            )
-            if not contract_paths:
-                raise InvalidPackage(f"{package_id} does not contain any .sol or .vy files")
-            if install_path.joinpath("contracts").is_dir():
-                brownie_config["project_structure"]["contracts"] = "contracts"
-            elif len(contract_paths) == 1:
-                brownie_config["project_structure"]["contracts"] = contract_paths.pop()
-            else:
-                raise InvalidPackage(
-                    f"{package_id} has no `contracts/` subdirectory, and "
-                    "multiple directories containing source files"
-                )
-
-            with install_path.joinpath("brownie-config.yaml").open("w") as fp:
-                yaml.dump(brownie_config, fp)
-
-        project = load(install_path)
-        project.close()
-    except InvalidPackage:
-        shutil.rmtree(install_path)
-        raise
-    except Exception as e:
-        notify(
-            "WARNING",
-            f"Unable to compile {package_id} due to a {type(e).__name__} - you may still be able to"
-            " import sources from the package, but will be unable to load the package directly.\n",
-        )
-
-    return f"{org}/{repo}@{version}"
+    return next(i["zipball_url"] for i in data if i["name"].lstrip("v") == version)
 
 
 def _create_gitfiles(project_path: Path) -> None:
@@ -937,6 +944,22 @@ def _compare_settings(left: Dict, right: Dict) -> bool:
     )
 
 
+def _normalize_solidity_version(version: str) -> str:
+    return version.split("+")[0]
+
+
+def _solidity_compiler_equal(config: dict, build: dict) -> bool:
+    return (
+        config["version"] is None
+        or _normalize_solidity_version(config["version"])
+        == _normalize_solidity_version(build["version"])
+    ) and config["optimizer"] == build["optimizer"]
+
+
+def _vyper_compiler_equal(config: dict, build: dict) -> bool:
+    return config["version"] is None or config["version"] == build["version"]
+
+
 def _load_sources(project_path: Path, subfolder: str, allow_json: bool) -> Dict:
     contract_sources: Dict = {}
     suffixes: Tuple = (".sol", ".vy")
@@ -953,7 +976,7 @@ def _load_sources(project_path: Path, subfolder: str, allow_json: bool) -> Dict:
             continue
         if next((i for i in path.relative_to(project_path).parts if i.startswith("_")), False):
             continue
-        with path.open() as fp:
+        with path.open(encoding="utf-8") as fp:
             source = fp.read()
 
         if hasattr(hooks, "brownie_load_source"):

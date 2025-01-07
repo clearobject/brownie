@@ -12,7 +12,12 @@ from requests.exceptions import ConnectionError as RequestsConnectionError
 from brownie.exceptions import InvalidArgumentWarning, RPCRequestError
 from brownie.network.web3 import web3
 
-CLI_FLAGS = {"port": "--port", "fork": "--fork", "fork_block": "--fork-block-number"}
+CLI_FLAGS = {
+    "port": "--port",
+    "host": "--hostname",
+    "fork": "--fork",
+    "fork_block": "--fork-block-number",
+}
 IGNORED_SETTINGS = ["chain_id"]
 
 HARDHAT_CONFIG = """
@@ -37,11 +42,11 @@ def launch(cmd: str, **kwargs: Dict) -> None:
 
     Args:
         cmd: command string to execute as subprocess"""
-    # if sys.platform == "win32" and not cmd.split(" ")[0].endswith(".cmd"):
-    #     if " " in cmd:
-    #         cmd = cmd.replace(" ", ".cmd ", 1)
-    #     else:
-    #         cmd += ".cmd"
+    if sys.platform == "win32" and not cmd.split(" ")[0].endswith(".cmd"):
+        if " " in cmd:
+            cmd = cmd.replace(" ", ".cmd ", 1)
+        else:
+            cmd += ".cmd"
     cmd_list = cmd.split(" ")
     for key, value in [(k, v) for k, v in kwargs.items() if v and k not in IGNORED_SETTINGS]:
         try:

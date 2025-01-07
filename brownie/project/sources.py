@@ -14,7 +14,6 @@ from brownie.utils import color
 
 
 class Sources:
-
     """Methods for accessing and manipulating a project's contract source files."""
 
     def __init__(self, contract_sources: Dict, interface_sources: Dict) -> None:
@@ -191,16 +190,17 @@ def get_contract_names(full_source: str) -> List:
 
     contract_names = []
     for source in contracts:
-        type_, name, _ = re.findall(
+        matches = re.findall(
             r"(abstract contract|contract|library|interface)\s+(\S*)\s*(?:is\s+([\s\S]*?)|)(?:{)",
             source,
-        )[0]
-        contract_names.append((name, type_))
+        )
+        if matches:
+            type_, name, _ = matches[0]
+            contract_names.append((name, type_))
     return contract_names
 
 
 def get_pragma_spec(source: str, path: Optional[str] = None) -> NpmSpec:
-
     """
     Extracts pragma information from Solidity source code.
 
@@ -231,7 +231,9 @@ def get_vyper_pragma_spec(source: str, path: Optional[str] = None) -> NpmSpec:
 
     Returns: NpmSpec object
     """
-    pragma_match = next(re.finditer(r"(?:\n|^)\s*#\s*@version\s*([^\n]*)", source), None)
+    pragma_match = next(
+        re.finditer(r"(?:\n|^)\s*#\s*(?:pragma version|@version)\s*([^\n]*)", source), None
+    )
     if pragma_match is None:
         if path:
             raise PragmaError(f"No version pragma in '{path}'")

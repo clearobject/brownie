@@ -118,10 +118,11 @@ def test_validate_cmd_settings():
         mnemonic: brownie
         account_keys_path: ../../
         fork: main
+        disable_cache: true
     """
     cmd_settings_dict = yaml.safe_load(cmd_settings)
     valid_dict = _validate_cmd_settings(cmd_settings_dict)
-    for (k, v) in cmd_settings_dict.items():
+    for k, v in cmd_settings_dict.items():
         assert valid_dict[k] == v
 
 

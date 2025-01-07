@@ -16,13 +16,14 @@ from brownie.exceptions import RPCConnectionError, RPCProcessError
 from brownie.network.state import Chain
 from brownie.network.web3 import web3
 
-from . import ganache, geth, hardhat
+from . import anvil, ganache, geth, hardhat
 
 chain = Chain()
 
 ATTACH_BACKENDS = {"ethereumjs testrpc": ganache, "geth": geth, "hardhat": hardhat}
 
 LAUNCH_BACKENDS = {
+    "anvil": anvil,
     "ganache": ganache,
     "ethnode": geth,
     "geth": geth,
@@ -116,7 +117,7 @@ class Rpc(metaclass=_Singleton):
         self.process = psutil.Process(pid)
 
         for key, module in ATTACH_BACKENDS.items():
-            if web3.clientVersion.lower().startswith(key):
+            if web3.client_version.lower().startswith(key):
                 self.backend = module
                 break
 
@@ -145,7 +146,6 @@ class Rpc(metaclass=_Singleton):
                 pass
         self.process.kill()
         self.process.wait()
-        self.process = None
         chain._network_disconnected()
 
     def is_active(self) -> bool:

@@ -3,6 +3,8 @@ from copy import deepcopy
 
 import pytest
 import requests
+import yaml
+from semantic_version import Version
 
 from brownie import Wei
 from brownie.exceptions import BrownieCompilerWarning, BrownieEnvironmentWarning, ContractNotFound
@@ -12,6 +14,7 @@ from brownie.network.contract import (
     ContractTx,
     ProjectContract,
     _DeployedContractBase,
+    _get_deployment,
 )
 
 
@@ -90,37 +93,11 @@ def test_contractabi_replace_contract(testproject, tester):
     Contract.from_abi("BrownieTester", tester.address, tester.abi)
 
 
-def test_contract_from_ethpm(ipfs_mock, network):
-    network.connect("ropsten")
-    Contract.from_ethpm("ComplexNothing", manifest_uri="ipfs://testipfs-complex")
-
-
-def test_contract_from_ethpm_multiple_deployments(ipfs_mock, network):
-    network.connect("mainnet")
-    with pytest.raises(ValueError):
-        Contract.from_ethpm("ComplexNothing", manifest_uri="ipfs://testipfs-complex")
-
-
-def test_contract_from_ethpm_no_deployments(ipfs_mock, network):
-    network.connect("kovan")
-    with pytest.raises(ContractNotFound):
-        Contract.from_ethpm("ComplexNothing", manifest_uri="ipfs://testipfs-complex")
-
-
 def test_deprecated_init_abi(tester):
     with pytest.warns(DeprecationWarning):
         old = Contract("BrownieTester", tester.address, tester.abi)
 
     assert old == Contract.from_abi("BrownieTester", tester.address, tester.abi)
-
-
-def test_deprecated_init_ethpm(ipfs_mock, network):
-    network.connect("ropsten")
-
-    with pytest.warns(DeprecationWarning):
-        old = Contract("ComplexNothing", manifest_uri="ipfs://testipfs-complex")
-
-    assert old == Contract.from_ethpm("ComplexNothing", manifest_uri="ipfs://testipfs-complex")
 
 
 def test_from_explorer(network):
@@ -214,7 +191,7 @@ def test_existing_different_chains(network):
         Contract.from_explorer("0x9f8f72aa9304c8b593d555f12ef6589cc3a579a2")
 
     network.disconnect()
-    network.connect("ropsten")
+    network.connect("goerli")
     with pytest.raises(ValueError):
         Contract("0x9f8f72aa9304c8b593d555f12ef6589cc3a579a2")
 
@@ -293,9 +270,9 @@ def test_autofetch_missing(network, config, mocker):
 
 
 def test_as_proxy_for(network):
-    proxy = "0xAfE212AEDf1c8dCd0E470d73B3B4035D32A75Efd"
-    impl = "0x098DCb095318A8B5321c5f2DB3fA04a55A780A20"
-    network.connect("ropsten")
+    proxy = "0x2410B710ecA3818003c091c42E3803cC7D70AeE9"
+    impl = "0x7542fb54dc0c2d71a00d9409b48f5e464b5e9f24"
+    network.connect("goerli")
 
     original = Contract.from_explorer(proxy)
     proxy = Contract.from_explorer(proxy, as_proxy_for=impl)
@@ -306,6 +283,120 @@ def test_as_proxy_for(network):
 
     assert proxy.abi == implementation.abi
     assert proxy.address != implementation.address
+
+
+def test_solc_use_latest_patch_true(testproject, network):
+    network.connect("mainnet")
+    solc_config = {"compiler": {"solc": {"use_latest_patch": True}}}
+    with testproject._path.joinpath("brownie-config.yaml").open("w") as fp:
+        yaml.dump(solc_config, fp)
+
+    assert Contract.get_solc_version(
+        "v0.4.16", "0x514910771AF9Ca656af840dff83E8264EcF986CA"
+    ) == Version("0.4.26")
+
+
+def test_solc_use_latest_patch_false(testproject, network):
+    network.connect("mainnet")
+    solc_config = {"compiler": {"solc": {"use_latest_patch": False}}}
+    with testproject._path.joinpath("brownie-config.yaml").open("w") as fp:
+        yaml.dump(solc_config, fp)
+
+    assert Contract.get_solc_version(
+        "v0.4.16", "0x514910771AF9Ca656af840dff83E8264EcF986CA"
+    ) == Version("0.4.16")
+
+
+def test_solc_use_latest_patch_missing(testproject, network):
+    network.connect("mainnet")
+    solc_config = {"compiler": {"solc": {}}}
+    with testproject._path.joinpath("brownie-config.yaml").open("w") as fp:
+        yaml.dump(solc_config, fp)
+
+    assert Contract.get_solc_version(
+        "v0.4.16", "0x514910771AF9Ca656af840dff83E8264EcF986CA"
+    ) == Version("0.4.16")
+
+
+def test_solc_use_latest_patch_specific_not_included(testproject, network):
+    network.connect("mainnet")
+    solc_config = {
+        "compiler": {"solc": {"use_latest_patch": ["0x0bc529c00C6401aEF6D220BE8C6Ea1667F6Ad93e"]}}
+    }
+    with testproject._path.joinpath("brownie-config.yaml").open("w") as fp:
+        yaml.dump(solc_config, fp)
+
+    assert Contract.get_solc_version(
+        "v0.4.16", "0x514910771AF9Ca656af840dff83E8264EcF986CA"
+    ) == Version("0.4.16")
+
+
+def test_solc_use_latest_patch_specific_included(testproject, network):
+    network.connect("mainnet")
+    solc_config = {
+        "compiler": {"solc": {"use_latest_patch": ["0x514910771AF9Ca656af840dff83E8264EcF986CA"]}}
+    }
+    with testproject._path.joinpath("brownie-config.yaml").open("w") as fp:
+        yaml.dump(solc_config, fp)
+
+    assert Contract.get_solc_version(
+        "v0.4.16", "0x514910771AF9Ca656af840dff83E8264EcF986CA"
+    ) == Version("0.4.26")
+
+
+def test_abi_deployment_enabled_by_default(network, build):
+    network.connect("mainnet")
+    address = "0x0bc529c00c6401aef6d220be8c6ea1667f6ad93e"
+    Contract.from_abi("abiTester", address, build["abi"])
+
+    assert _get_deployment(address) != (None, None)
+    # cleanup
+    Contract.remove_deployment(address)
+
+
+def test_abi_deployment_disabled(network, build):
+    network.connect("mainnet")
+    address = "0x0bc529c00c6401aef6d220be8c6ea1667f6ad93e"
+    Contract.from_abi("abiTester", address, build["abi"], persist=False)
+
+    assert _get_deployment(address) == (None, None)
+
+
+def test_from_explorer_deployment_enabled_by_default(network):
+    network.connect("mainnet")
+    address = "0x0bc529c00c6401aef6d220be8c6ea1667f6ad93e"
+    Contract.from_explorer(address)
+
+    assert _get_deployment(address) != (None, None)
+    # cleanup
+    Contract.remove_deployment(address)
+
+
+def test_from_explorer_deployment_disabled(network):
+    network.connect("mainnet")
+    address = "0x0bc529c00c6401aef6d220be8c6ea1667f6ad93e"
+    Contract.from_explorer(address, persist=False)
+
+    assert _get_deployment(address) == (None, None)
+
+
+def test_remove_deployment(network):
+    network.connect("mainnet")
+    address = "0x0bc529c00c6401aef6d220be8c6ea1667f6ad93e"
+    Contract.from_explorer(address)
+    Contract.remove_deployment(address)
+
+    assert _get_deployment(address) == (None, None)
+
+
+def test_remove_deployment_returns(network):
+    network.connect("mainnet")
+    address = "0x0bc529c00c6401aef6d220be8c6ea1667f6ad93e"
+    Contract.from_explorer(address)
+    build_json, sources = _get_deployment(address)
+
+    assert (build_json, sources) != (None, None)
+    assert (build_json, sources) == (Contract.remove_deployment(address))
 
 
 # @pytest.mark.parametrize(

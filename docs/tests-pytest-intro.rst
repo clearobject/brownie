@@ -94,7 +94,7 @@ Fixtures can also be included as dependencies of other fixtures:
 Brownie Pytest Fixtures
 -----------------------
 
-Brownie provides fixtures that simplify interact with and testing your project. Most core Brownie functionality can be accessed via a fixture rather than an import statement. For example, here is the previous example using Brownie fixtures rather than imports:
+Brownie provides fixtures that simplify interacting with and testing your project. Most core Brownie functionality can be accessed via a fixture rather than an import statement. For example, here is the previous example using Brownie fixtures rather than imports:
 
 .. code-block:: python
     :linenos:
@@ -152,7 +152,7 @@ Brownie provides two fixtures that are used to handle isolation:
     * :func:`module_isolation <fixtures.module_isolation>` is a module scoped fixture. It resets the local chain before and after completion of the module, ensuring a clean environment for this module and that the results of it will not affect subsequent modules.
     * :func:`fn_isolation <fixtures.fn_isolation>` is function scoped. It additionally takes a snapshot of the chain before running each test, and reverts to it when the test completes. This allows you to define a common state for each test, reducing repetitive transactions.
 
-Isolation fixtures are **always the first fixture within their scope to execute**. You can be certain that any action performed within a fuction-scoped fixture will happend `after` the isolation snapshot.
+Isolation fixtures are **always the first fixture within their scope to execute**. You can be certain that any action performed within a fuction-scoped fixture will happen `after` the isolation snapshot.
 
 To apply an isolation fixture to all tests in a module, require it in another fixture and include the ``autouse`` parameter:
 
@@ -379,7 +379,7 @@ Or to run a specific test:
 
     $ brownie test tests/test_transfer.py
 
-Test results are saved at ``build/tests.json``. This file holds the results of each test, coverage analysis data, and hashes that are used to determine if any related files have changed since the tests last ran. If you abort test execution early via a ``KeyboardInterrupt``, results are only be saved for modules that fully completed.
+Test results are saved at ``build/tests.json``. This file holds the results of each test, coverage analysis data, and hashes that are used to determine if any related files have changed since the tests last ran. If you abort test execution early via a ``KeyboardInterrupt``, results are only saved for modules that fully completed.
 
 Only Running Updated Tests
 --------------------------
